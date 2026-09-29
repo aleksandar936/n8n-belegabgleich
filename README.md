@@ -10,8 +10,8 @@ Gebaut mit [n8n](https://n8n.io) (Low-Code-Automatisierung) und GPT-4o.
 > (two PDFs), extracts line items with GPT-4o, flags price/quantity deviations and emails a
 > colour-coded audit report. Includes a feedback form that collects reviewer corrections.
 
-![Workflow](screenshots/workflow.png)
-![Feedback-Workflow](screenshots/feedback.png)
+![Workflow](workflow.png)
+![Feedback-Workflow](feedback.png)
 
 ---
 
@@ -79,11 +79,12 @@ und dem Extraktions-Prompt mitgeben).
 
 ## Installation
 
-1. Beide `.json`-Dateien aus `workflow/` in n8n importieren (*Workflows → Import from File*).
+1. Beide `.json`-Dateien in n8n importieren (*Workflows → Import from File*).
 2. Eigene Credentials hinterlegen (OpenAI, Gmail) – die sind aus Datenschutzgründen
    **nicht** Teil dieses Exports.
 3. Eine Data Table `Feedback` anlegen mit den Spalten `beleg`, `falsche_positionen`,
-   `kommentar`, `name` (alle String) und im Feedback-Workflow auswählen.
+   `kommentar`, `name` (alle String) und im Node „Insert row“ des Feedback-Workflows
+   einmal neu aus der Liste anklicken – erst dann ist sie wirklich verknüpft.
 4. Den Feedback-Workflow aktivieren, die Production-URL seines Formulars kopieren und im
    Node **HTML Report** bei `FEEDBACK_URL` eintragen.
 
