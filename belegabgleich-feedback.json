@@ -1,0 +1,162 @@
+{
+  "name": "Belegabgleich Feedback",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Feedback zur Auftragsbestätigungs-Prüfung",
+        "formDescription": "Bitte geben Sie an, welche Positionen fehlerhaft waren, und hinterlegen Sie einen Kommentar für künftige Prüfungen.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Beleg (Bestellnummer / AB-Nummer) →",
+              "fieldType": "=text",
+              "fieldOptions": {
+                "values": [
+                  {}
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Falsche Positionen (z.B. 3)",
+              "fieldType": "=text",
+              "fieldOptions": {
+                "values": [
+                  {}
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Kommentar für künftige Auftragsbestätigungen",
+              "fieldType": "=text",
+              "fieldOptions": {
+                "values": [
+                  {}
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Ihr Name / Kürzel",
+              "fieldType": "=text",
+              "fieldOptions": {
+                "values": [
+                  {}
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "33cd9b66-2b5d-4136-9bb2-ca900e90ecbd",
+      "name": "On form submission",
+      "webhookId": "REPLACE-WITH-YOUR-OWN-ON-IMPORT"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "YOUR_DATATABLE_ID",
+          "mode": "list",
+          "cachedResultName": "Feedback",
+          "cachedResultUrl": "/projects/YOUR_PROJECT_ID/datatables/YOUR_DATATABLE_ID"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "beleg": "={{ $json['Beleg (Bestellnummer / AB-Nummer) →'] }}",
+            "falsche_positionen": "={{ $json['Falsche Positionen (z.B. 3)'] }}",
+            "kommentar": "={{ $json['Kommentar für künftige Auftragsbestätigungen'] }}",
+            "name": "={{ $json['Ihr Name / Kürzel'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "beleg",
+              "displayName": "beleg",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "falsche_positionen",
+              "displayName": "falsche_positionen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "kommentar",
+              "displayName": "kommentar",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        0
+      ],
+      "id": "e5caadd6-3396-4008-9493-11a93c0cc71e",
+      "name": "Insert row"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "fddb3200-3592-4c33-baad-d70198198381",
+  "meta": {
+    "instanceId": "REDACTED"
+  },
+  "nodeGroups": [],
+  "id": "bvGgraIgtqThF6wI",
+  "tags": []
+}

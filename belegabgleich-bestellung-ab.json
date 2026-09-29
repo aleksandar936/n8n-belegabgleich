@@ -1,0 +1,354 @@
+{
+  "name": "Belegabgleich Bestellung ↔ AB",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Lieferanten-Auftragsbestätigungs-Prüfung",
+        "formDescription": "Laden Sie die Bestellung und die dazugehörige Auftragsbestätigung als PDF hoch. Das Prüfergebnis wird an die angegebene E-Mail-Adresse gesendet.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Bestell-PDF",
+              "fieldType": "file",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "AB-PDF",
+              "fieldType": "file",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "E-Mail",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Preistoleranz in Prozent",
+              "fieldType": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -16,
+        -16
+      ],
+      "id": "4c1bc3ba-1ebd-41d1-9c11-11f203051890",
+      "name": "On form submission",
+      "webhookId": "REPLACE-WITH-YOUR-OWN-ON-IMPORT"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "Bestell_PDF",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        -128
+      ],
+      "id": "e2c306bd-7408-4938-8099-58c8ad916633",
+      "name": "Extract Bestellung"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Du bist ein Extraktor für deutsche Einkaufsbelege (Bestellungen und Auftragsbestätigungen).\nGib AUSSCHLIESSLICH gültiges JSON zurück – kein Fließtext, kein Markdown, keine ```-Zeichen.\n\nVORGEHEN (in dieser Reihenfolge):\n1. Lies pro Position: Artikelnummer, Konfiguration, Rabatt%, und die zwei Preiszahlen (Einzelpreis und Gesamtpreis) sowie die Menge.\n2. Der PDF-Text verklebt Zahlen oft ohne Trennzeichen. Beispiele:\n   - LieferantX-Bestellung: \"593,0031 Stück\" = Einzelpreis 593,00 + Menge 3 + Positionsnr 1\n   - LieferantX-Bestellung: \"1.509,0017 Stück\" = Einzelpreis 1509,00 + Menge 1 + Positionsnr 7\n   - LieferantY-Bestellung: \"636,89-45,00%578,9921 Stück\" = Gesamtpreis 636,89 + Rabatt 45% + Einzelpreis 578,99 + Menge 2 + Positionsnr 1\n   - LieferantY-AB: \"636,89578,99 -45,002\" = Gesamtpreis 636,89 + Einzelpreis 578,99 + Rabatt 45% + Menge 2\n   Beachte: Die Reihenfolge (Einzelpreis vs. Gesamtpreis zuerst) ist je Beleg unterschiedlich. Ordne über die Plausibilität zu, NICHT über die Position im Text.\n3. PLAUSIBILITÄT (Pflicht): Es muss gelten gesamtpreis = einzelpreis * (1 - rabatt/100) * menge.\n   - Der einzelpreis ist der Listen-/Stückpreis VOR Rabatt.\n   - Prüfe deine Zuordnung mit dieser Formel. Wenn sie nicht aufgeht, hast du Zahlen vertauscht oder Ziffern verloren – korrigiere.\n4. SUMMEN-KONTROLLE (Pflicht): Der Beleg nennt eine Gesamt-/Nettosumme (z.B. \"Gesamtbetrag (netto)\", \"Nettosumme\"). Die Summe aller gesamtpreis-Werte MUSS dieser Summe entsprechen. Wenn nicht, hast du mindestens eine Zahl falsch gelesen (oft eine verlorene führende Ziffer, z.B. 473,59 statt 2.473,59). Korrigiere die Positionen, bis die Summe exakt stimmt.\n\nWeitere Regeln:\n- Zahlen als Dezimalzahl mit Punkt (1509.00). Entferne Tausenderpunkte und \"EUR\".\n- Wenn der Rabatt mehrstufig ist (Grundrabatt 46% + Zusatzrabatt 10%), nimm den GESAMT-Rabatt (56.00).\n- \"pos\": nur die reine Positionsnummer (1, 2, 3 …), NICHT mit Artikelnummer oder Menge verkleben.\n- \"kundennummer\": nur die echte Kundennummer, nicht Gewicht/Volumen.\n- \"artikelnummer\": die Artikel-/Modellnummer wie im Beleg (z.B. \"8010\", \"8106\", \"1100-F001\", \"CU 8010\", \"P-101-STBK-BK-CM01\").\n- \"konfiguration\": alle Ausstattungsangaben (Stoff, Farbe, Gestell, Rollen, Gasfeder …) als EIN Freitext, mit \"; \" getrennt.\n- Fehlt ein Wert, setze null. Nichts erfinden.\n\nZielschema:\n{\n  \"belegtyp\": \"bestellung\" oder \"auftragsbestaetigung\",\n  \"meta\": { \"bestellnummer\": string|null, \"ab_nummer\": string|null, \"ab_datum\": string|null, \"kundennummer\": string|null, \"waehrung\": string|null, \"netto_gesamt\": number|null, \"zahlungsbedingung\": string|null, \"incoterms\": string|null, \"liefertermin\": string|null },\n  \"anschriften\": { \"lieferant\": string|null, \"besteller\": string|null, \"lieferadresse\": string|null },\n  \"positionen\": [ { \"pos\": string, \"artikelnummer\": string, \"bezeichnung\": string, \"konfiguration\": string, \"menge\": number, \"einheit\": string|null, \"einzelpreis\": number|null, \"rabatt_prozent\": number|null, \"gesamtpreis\": number|null, \"liefertermin\": string|null } ]\n}\n\nHier ist der auszuwertende Belegtext:\n{{ $json.text }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        80
+      ],
+      "id": "adbeb34e-c671-446a-bf62-d0925a71e9fe",
+      "name": "KI Extraktion AB",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "=Du bist ein Extraktor für deutsche Einkaufsbelege (Bestellungen und Auftragsbestätigungen).\nGib AUSSCHLIESSLICH gültiges JSON zurück – kein Fließtext, kein Markdown, keine ```-Zeichen.\n\nVORGEHEN (in dieser Reihenfolge):\n1. Lies pro Position: Artikelnummer, Konfiguration, Rabatt%, und die zwei Preiszahlen (Einzelpreis und Gesamtpreis) sowie die Menge.\n2. Der PDF-Text verklebt Zahlen oft ohne Trennzeichen. Beispiele:\n   - LieferantX-Bestellung: \"593,0031 Stück\" = Einzelpreis 593,00 + Menge 3 + Positionsnr 1\n   - LieferantX-Bestellung: \"1.509,0017 Stück\" = Einzelpreis 1509,00 + Menge 1 + Positionsnr 7\n   - LieferantY-Bestellung: \"636,89-45,00%578,9921 Stück\" = Gesamtpreis 636,89 + Rabatt 45% + Einzelpreis 578,99 + Menge 2 + Positionsnr 1\n   - LieferantY-AB: \"636,89578,99 -45,002\" = Gesamtpreis 636,89 + Einzelpreis 578,99 + Rabatt 45% + Menge 2\n   Beachte: Die Reihenfolge (Einzelpreis vs. Gesamtpreis zuerst) ist je Beleg unterschiedlich. Ordne über die Plausibilität zu, NICHT über die Position im Text.\n3. PLAUSIBILITÄT (Pflicht): Es muss gelten gesamtpreis = einzelpreis * (1 - rabatt/100) * menge.\n   - Der einzelpreis ist der Listen-/Stückpreis VOR Rabatt.\n   - Prüfe deine Zuordnung mit dieser Formel. Wenn sie nicht aufgeht, hast du Zahlen vertauscht oder Ziffern verloren – korrigiere.\n4. SUMMEN-KONTROLLE (Pflicht): Der Beleg nennt eine Gesamt-/Nettosumme (z.B. \"Gesamtbetrag (netto)\", \"Nettosumme\"). Die Summe aller gesamtpreis-Werte MUSS dieser Summe entsprechen. Wenn nicht, hast du mindestens eine Zahl falsch gelesen (oft eine verlorene führende Ziffer, z.B. 473,59 statt 2.473,59). Korrigiere die Positionen, bis die Summe exakt stimmt.\n\nWeitere Regeln:\n- Zahlen als Dezimalzahl mit Punkt (1509.00). Entferne Tausenderpunkte und \"EUR\".\n- Wenn der Rabatt mehrstufig ist (Grundrabatt 46% + Zusatzrabatt 10%), nimm den GESAMT-Rabatt (56.00).\n- \"pos\": nur die reine Positionsnummer (1, 2, 3 …), NICHT mit Artikelnummer oder Menge verkleben.\n- \"kundennummer\": nur die echte Kundennummer, nicht Gewicht/Volumen.\n- \"artikelnummer\": die Artikel-/Modellnummer wie im Beleg (z.B. \"8010\", \"8106\", \"1100-F001\", \"CU 8010\", \"P-101-STBK-BK-CM01\").\n- \"konfiguration\": alle Ausstattungsangaben (Stoff, Farbe, Gestell, Rollen, Gasfeder …) als EIN Freitext, mit \"; \" getrennt.\n- Fehlt ein Wert, setze null. Nichts erfinden.\n\nZielschema:\n{\n  \"belegtyp\": \"bestellung\" oder \"auftragsbestaetigung\",\n  \"meta\": { \"bestellnummer\": string|null, \"ab_nummer\": string|null, \"ab_datum\": string|null, \"kundennummer\": string|null, \"waehrung\": string|null, \"netto_gesamt\": number|null, \"zahlungsbedingung\": string|null, \"incoterms\": string|null, \"liefertermin\": string|null },\n  \"anschriften\": { \"lieferant\": string|null, \"besteller\": string|null, \"lieferadresse\": string|null },\n  \"positionen\": [ { \"pos\": string, \"artikelnummer\": string, \"bezeichnung\": string, \"konfiguration\": string, \"menge\": number, \"einheit\": string|null, \"einzelpreis\": number|null, \"rabatt_prozent\": number|null, \"gesamtpreis\": number|null, \"liefertermin\": string|null } ]\n}\n\nHier ist der auszuwertende Belegtext:\n{{ $json.text }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          },
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        384,
+        -128
+      ],
+      "id": "2cb19d53-ac48-4317-8327-7c5df76a8251",
+      "name": "KI Extraktion Bestellung",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "AB_PDF",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        224,
+        80
+      ],
+      "id": "d264990a-d800-409e-9654-f3ab51ac5e79",
+      "name": "Extract AB"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        736,
+        -16
+      ],
+      "id": "8316a1ee-901f-4fd1-91d7-36a9559727af",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Holt beide Belege und korrigiert Menge + Preis-Zuordnung layout-unabhängig.\nfunction rein(node) {\n  const j = $(node).first().json;\n  let beleg;\n  if (j && j.belegtyp && Array.isArray(j.positionen)) beleg = j;\n  else {\n    const t = j?.output?.[0]?.content?.[0]?.text;\n    if (t && typeof t === \"object\") beleg = t;\n    else if (typeof t === \"string\") { try { beleg = JSON.parse(t); } catch(e){ beleg = j; } }\n    else beleg = j;\n  }\n\n  if (beleg?.positionen) {\n    for (const p of beleg.positionen) {\n      const rab = (p.rabatt_prozent || 0) / 100;\n      let ep = p.einzelpreis, gp = p.gesamtpreis;\n\n      // Kandidaten für den Stück-Nettopreis (kleinerer der beiden geteilt macht keinen Sinn -\n      // wir prüfen, welcher der beiden Werte der Einzelpreis ist).\n      // Regel: Der Einzelpreis (vor Rabatt) ist der größere pro-Stück-Wert.\n      // Menge ergibt sich als gesamt / (einzel * (1-rabatt)).\n      function mengeFuer(einzel, gesamt){\n        const netto = einzel * (1 - rab);\n        return netto > 0 ? gesamt / netto : Infinity;\n      }\n      if (ep != null && gp != null) {\n        // Variante A: ep=Einzelpreis, gp=Gesamtpreis  -> Menge sollte ganzzahlig sein\n        const mA = mengeFuer(ep, gp);\n        // Variante B: vertauscht\n        const mB = mengeFuer(gp, ep);\n        const abwA = Math.abs(mA - Math.round(mA)); // wie weit von ganzer Zahl?\n        const abwB = Math.abs(mB - Math.round(mB));\n        // Nur tauschen, wenn B DEUTLICH ganzzahliger ist als A und A unplausibel\n        const plausibelA = mA >= 0.5 && mA < 1000 && abwA < 0.02;\n        const plausibelB = mB >= 0.5 && mB < 1000 && abwB < 0.02;\n        if (plausibelB && !plausibelA) { const t = ep; ep = gp; gp = t; }\n      }\n\n      // Menge deterministisch aus den (nun korrekten) Preisen\n      const netto = ep * (1 - rab);\n      if (netto > 0 && gp != null) {\n        const m = Math.round(gp / netto);\n        if (m > 0 && m < 1000) p.menge = m;\n      }\n      p.einzelpreis = ep;\n      p.gesamtpreis = gp;\n    }\n  }\n  return beleg;\n}\n\nconst bestellung = rein(\"KI Extraktion Bestellung\");\nconst ab         = rein(\"KI Extraktion AB\");\nreturn [{ json: { bestellung, ab } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -16
+      ],
+      "id": "d81320d5-f204-4014-98d0-f29f45a90155",
+      "name": "Belege aufbereiten"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vergleich Bestellung <-> AB. Findet Abweichungen bei Preis, Menge, Summe.\nconst data = $input.first().json;\nconst order = data.bestellung || {};\nconst conf  = data.ab || {};\n\nconst S = { IDENT:\"identical\", INFO:\"info\", OK:\"probably_ok\", DIFF:\"difference\" };\nconst near = (a,b) => (a==null||b==null) ? a===b : Math.abs(a-b) < 0.005;\n\n// Preistoleranz aus dem Formular (in Prozent, optional). Leer oder ungültig = 0.\nlet toleranz = 0;\ntry {\n  const roh = $('On form submission').first().json['Preistoleranz in Prozent'];\n  const t = Number(String(roh ?? '').replace(',', '.'));\n  if (Number.isFinite(t) && t > 0) toleranz = t;\n} catch (e) { toleranz = 0; }\nconst de = n => String(n).replace('.', ',');\n\n// Artikelnummer auf Modellkern reduzieren (8010, 8106, 1100 ...)\nfunction kern(art){\n  if(!art) return \"\";\n  const m = String(art).toUpperCase().replace(/[^A-Z0-9]/g,\" \").match(/\\b(\\d{3,4})\\b/);\n  return m ? m[1] : String(art).toUpperCase();\n}\n// Konfig-Tokens (Stoff/Farbe) zum Unterscheiden gleicher Modelle\nfunction tokens(p){\n  const t = ((p.konfiguration||\"\")+\" \"+(p.artikelnummer||\"\")).toLowerCase();\n  const set = new Set();\n  [\"stoff1\",\"stoff2\",\"stoff3\",\"stoff4\",\"stoff5\",\"stoff7\",\"stoff6\"].forEach(s=>{ if(t.includes(s)) set.add(s); });\n  [\"schwarz\",\"weiß\",\"weiss\",\"silber\",\"moss\",\"grau\",\"black\",\"white\"].forEach(f=>{ if(t.includes(f)) set.add(f.replace(\"weiss\",\"weiß\").replace(\"black\",\"schwarz\").replace(\"white\",\"weiß\")); });\n  (t.match(/\\b\\d{3}\\b/g)||[]).forEach(n=>set.add(n));\n  return set;\n}\nfunction score(a,b){\n  const A=tokens(a), B=tokens(b); if(!A.size&&!B.size) return 0;\n  let i=0; A.forEach(x=>{ if(B.has(x)) i++; }); return i/Math.max(A.size,B.size);\n}\n\n// Positionen matchen: nach Modellkern, dann per Konfig-Score\nfunction match(op, cp){\n  const pool = cp.map((p,i)=>({p,i,used:false}));\n  const paare=[];\n  for(const o of op){\n    const k=kern(o.artikelnummer);\n    const kand=pool.filter(c=>!c.used && kern(c.p.artikelnummer)===k);\n    let best=null,bs=-1;\n    for(const c of kand){\n      let s=score(o,c.p)*100;\n      if(o.menge===c.p.menge) s+=5;\n      if(near(o.einzelpreis,c.p.einzelpreis)) s+=3;\n      if(s>bs){bs=s;best=c;}\n    }\n    if(best){best.used=true; paare.push({order:o,conf:best.p});}\n    else paare.push({order:o,conf:null});\n  }\n  for(const c of pool) if(!c.used) paare.push({order:null,conf:c.p});\n  return paare;\n}\n\n// Mengen: immer exakt. Preise: Abweichung innerhalb der Toleranz = \"wahrscheinlich ok\".\nfunction cmpNum(feld,a,b,istPreis=false){\n  if(near(a,b)) return {feld,order:a,conf:b,status:S.IDENT,bemerkung:\"\"};\n  if(a==null||b==null) return {feld,order:a,conf:b,status:S.DIFF,bemerkung:\"Wert fehlt in einem der Belege.\"};\n  const diff = b-a;\n  const prozent = a !== 0 ? Math.abs(diff/a)*100 : Infinity;\n  if(istPreis && toleranz > 0 && prozent <= toleranz){\n    return {feld,order:a,conf:b,status:S.OK,\n      bemerkung:`Abweichung ${de(diff.toFixed(2))} (${de(prozent.toFixed(2))} %) – innerhalb der Toleranz von ${de(toleranz)} %.`};\n  }\n  const pz = Number.isFinite(prozent) ? ` / ${de(prozent.toFixed(2))} %` : \"\";\n  return {feld,order:a,conf:b,status:S.DIFF,bemerkung:`Abweichung: ${de(a)} → ${de(b)} (${de(diff.toFixed(2))}${pz})`};\n}\n\nfunction gesamtStatus(liste){\n  if(liste.some(d=>d.status===S.DIFF)) return S.DIFF;\n  if(liste.some(d=>d.status===S.OK)) return S.OK;\n  return S.IDENT;\n}\n\nconst paare = match(order.positionen||[], conf.positionen||[]);\nconst positionen = paare.map(({order:o,conf:c})=>{\n  const details=[];\n  if(o&&c){\n    details.push(cmpNum(\"Menge\",o.menge,c.menge));\n    details.push(cmpNum(\"Einzelpreis\",o.einzelpreis,c.einzelpreis,true));\n    details.push(cmpNum(\"Positionssumme\",o.gesamtpreis,c.gesamtpreis,true));\n  } else if(o&&!c){\n    details.push({feld:\"Position\",order:`Pos ${o.pos}: ${o.artikelnummer}`,conf:\"—\",status:S.DIFF,bemerkung:\"In AB nicht bestätigt.\"});\n  } else {\n    details.push({feld:\"Position\",order:\"—\",conf:`Pos ${c.pos}: ${c.artikelnummer}`,status:S.DIFF,bemerkung:\"Zusätzlich in AB, nicht bestellt.\"});\n  }\n  return {\n    posBE:o?.pos||null, posAB:c?.pos||null,\n    titel:(o?.bezeichnung||c?.bezeichnung||\"\"),\n    artBE:o?.artikelnummer||\"\", artAB:c?.artikelnummer||\"\",\n    status: gesamtStatus(details), details\n  };\n});\n\nconst kopf = [\n  cmpNum(\"Nettogesamtbetrag\", order.meta?.netto_gesamt, conf.meta?.netto_gesamt, true),\n];\n\n// Kontrollrechnung je Beleg: Summe der Positionen gegen die genannte Nettosumme.\n// Weicht sie ab, wurde evtl. falsch ausgelesen oder der Beleg selbst ist fehlerhaft.\nfor (const [name, beleg] of [[\"Bestellung\", order], [\"Auftragsbestätigung\", conf]]) {\n  const summe = (beleg.positionen||[]).reduce((s,p)=>s+(Number(p.gesamtpreis)||0),0);\n  const netto = beleg.meta?.netto_gesamt;\n  if (netto != null && Math.abs(summe - netto) >= 0.01) {\n    kopf.push({feld:`Summenkontrolle ${name}`, order:summe, conf:netto, status:S.INFO,\n      bemerkung:`Summe der Positionen (${de(summe.toFixed(2))}) ≠ Nettosumme laut Beleg (${de(Number(netto).toFixed(2))}). Beleg manuell prüfen.`});\n  }\n}\n\nconst anzahlDiff = positionen.filter(p=>p.status===S.DIFF).length\n                 + kopf.filter(k=>k.status===S.DIFF).length;\n\nreturn [{ json: {\n  bestellnummer: order.meta?.bestellnummer || conf.meta?.bestellnummer || \"\",\n  ab_nummer: conf.meta?.ab_nummer || \"\",\n  lieferant: (conf.anschriften?.lieferant||\"\").split(\",\")[0],\n  toleranz_prozent: toleranz,\n  anzahl_abweichungen: anzahlDiff,\n  kopf,\n  positionen\n}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        -16
+      ],
+      "id": "d09c0b24-b81b-4e4e-965f-04340ff4aec3",
+      "name": "Vergleich"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Baut aus dem Vergleichsergebnis das HTML-Prüfprotokoll – inkl. Feedback-Button.\nconst d = $input.first().json;\nconst ICON = { identical:\"✅\", info:\"ℹ️\", probably_ok:\"🔶\", difference:\"🔺\" };\nconst esc = s => String(s ?? \"\").replace(/[&<>\"]/g, c => ({\"&\":\"&amp;\",\"<\":\"&lt;\",\">\":\"&gt;\",'\"':\"&quot;\"}[c]));\nconst eur = n => (n==null?\"\":Number(n).toLocaleString(\"de-DE\",{minimumFractionDigits:2,maximumFractionDigits:2}));\n\n// Feedback-Formular-Adresse + Bestellnummer vorausgefüllt\n// Nach dem Import ersetzen: Production-URL des Formulars aus dem Workflow \"Belegabgleich Feedback\".\nconst FEEDBACK_URL = \"https://YOUR-N8N-INSTANCE/form/YOUR-FEEDBACK-FORM-ID\";\nconst feedbackLink = FEEDBACK_URL + \"?Beleg%20(Bestellnummer%20%2F%20AB-Nummer)=\" + encodeURIComponent((d.bestellnummer||\"\") + \" / \" + (d.ab_nummer||\"\"));\n\nconst ampel = d.anzahl_abweichungen > 0\n  ? `${d.anzahl_abweichungen} Abweichung(en) gefunden – bitte prüfen.`\n  : \"Keine Abweichungen gefunden.\";\nconst ampelClass = d.anzahl_abweichungen > 0 ? \"difference\" : \"identical\";\n\nconst kopfRows = (d.kopf||[]).map(r => `<tr class=\"status-${r.status}\">\n  <td class=\"st\">${ICON[r.status]}</td><td class=\"field\">${esc(r.feld)}</td>\n  <td>${eur(r.order)}</td><td>${eur(r.conf)}</td><td class=\"ki\">${esc(r.bemerkung)}</td></tr>`).join(\"\");\n\nconst posBlocks = (d.positionen||[]).map(p => {\n  const rows = p.details.map(x => `<tr class=\"status-${x.status}\">\n    <td class=\"st\">${ICON[x.status]}</td><td class=\"field\">${esc(x.feld)}</td>\n    <td>${typeof x.order===\"number\"?eur(x.order):esc(x.order)}</td>\n    <td>${typeof x.conf===\"number\"?eur(x.conf):esc(x.conf)}</td>\n    <td class=\"ki\">${esc(x.bemerkung)}</td></tr>`).join(\"\");\n  return `<div class=\"pos status-${p.status}\">\n    <div class=\"pos-head\">${ICON[p.status]} <strong>${esc(p.titel)}</strong>\n      <span class=\"ref\">Bestellung Pos ${esc(p.posBE??\"—\")} · AB Pos ${esc(p.posAB??\"—\")}</span></div>\n    <div class=\"art\">Artikelnr. Bestellung: <b>${esc(p.artBE)}</b> · AB: <b>${esc(p.artAB)}</b></div>\n    <table><thead><tr><th></th><th>Feld</th><th>Bestellung</th><th>Auftragsbestätigung</th><th>Bemerkung</th></tr></thead>\n    <tbody>${rows}</tbody></table></div>`;\n}).join(\"\");\n\nconst html = `<!doctype html><html lang=\"de\"><head><meta charset=\"utf-8\">\n<title>Prüfprotokoll AB ${esc(d.ab_nummer)} zu Bestellung ${esc(d.bestellnummer)}</title>\n<style>\nbody{font-family:Arial,sans-serif;color:#111;max-width:1000px;margin:0 auto;padding:16px}\nh1{font-size:20px}.disc{font-size:13px;color:#555;margin-bottom:10px}\n.ampel{display:inline-block;font-weight:700;padding:8px 14px;border-radius:8px;margin:8px 0}\n.ampel.difference{background:#fff1f2;color:#dc2626}.ampel.identical{background:#f0fdf4;color:#15803d}\n.legend{font-size:12px;color:#555;margin:6px 0}\ntable{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}\nth,td{border-bottom:1px solid #e5e7eb;padding:7px 9px;text-align:left;vertical-align:top}\nth{background:#f8fafc;font-size:12px}.field{font-weight:600}.st{width:36px}.ki{color:#374151;font-size:12px}\n.status-difference{background:#fff1f2}\n.status-probably_ok{background:#fffbeb}\n.status-info{background:#eff6ff}\n.pos{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin:12px 0}\n.pos-head{font-weight:700;margin-bottom:2px}.ref{font-size:12px;color:#475569;background:#e2e8f0;border-radius:999px;padding:2px 8px;margin-left:6px;font-weight:700}\n.art{font-size:12px;color:#555;margin-bottom:6px}\n.section{margin-top:18px;font-weight:700;font-size:15px}\n.fb{margin-top:24px;padding:16px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;text-align:center}\n.fb a{display:inline-block;background:#ef7a1a;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:7px}\n.fb p{font-size:12px;color:#555;margin:8px 0 0}\n</style></head><body>\n<h1>KI-Prüfprotokoll der Auftragsbestätigung ${esc(d.ab_nummer)} zur Bestellung ${esc(d.bestellnummer)}</h1>\n<p class=\"disc\">Lieferant: ${esc(d.lieferant)} · Eine KI kann Fehler machen – bitte prüfen Sie alle Werte sorgfältig. Keine Haftung.</p>\n<div class=\"ampel ${ampelClass}\">${ampel}</div>\n<div class=\"legend\">✅ Identisch &nbsp; 🔶 Innerhalb der Preistoleranz &nbsp; ℹ️ Hinweis (Summenkontrolle) &nbsp; 🔺 Abweichung${d.toleranz_prozent ? ` &nbsp;·&nbsp; Preistoleranz: ${esc(String(d.toleranz_prozent).replace('.', ','))} %` : \"\"}</div>\n<div class=\"section\">Kopfinformationen</div>\n<table><thead><tr><th></th><th>Feld</th><th>Bestellung</th><th>Auftragsbestätigung</th><th>Bemerkung</th></tr></thead><tbody>${kopfRows}</tbody></table>\n<div class=\"section\">Positionsvergleich</div>\n${posBlocks}\n<div class=\"fb\">\n  <a href=\"${feedbackLink}\" target=\"_blank\">Feedback geben / Positionen korrigieren</a>\n  <p>Öffnet ein Formular, in dem Sie fehlerhafte Positionen und Kommentare für künftige Prüfungen hinterlegen können.</p>\n</div>\n</body></html>`;\n\nreturn [{ json: { html, betreff: `Prüfprotokoll AB ${d.ab_nummer} zu Bestellung ${d.bestellnummer} – ${d.anzahl_abweichungen} Abweichung(en)` } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        -16
+      ],
+      "id": "a0ecc5a8-1ee4-4e59-be2a-bec55baf0a84",
+      "name": "HTML Report"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('On form submission').first().json['E-Mail'] }}",
+        "subject": "={{ $json.betreff }}",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        -16
+      ],
+      "id": "afb27fb2-5503-4f74-9d47-ff4aa1fe387e",
+      "name": "Send a message",
+      "webhookId": "REPLACE-WITH-YOUR-OWN-ON-IMPORT",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Extract Bestellung",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract AB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Bestellung": {
+      "main": [
+        [
+          {
+            "node": "KI Extraktion Bestellung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AB": {
+      "main": [
+        [
+          {
+            "node": "KI Extraktion AB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KI Extraktion AB": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "KI Extraktion Bestellung": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Belege aufbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Belege aufbereiten": {
+      "main": [
+        [
+          {
+            "node": "Vergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vergleich": {
+      "main": [
+        [
+          {
+            "node": "HTML Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Report": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a97fbe44-def1-4343-9824-c0466ddd3996",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REDACTED"
+  },
+  "nodeGroups": [],
+  "id": "GbAhfwToTugeqNu6",
+  "tags": []
+}
